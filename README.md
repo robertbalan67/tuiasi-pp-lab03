@@ -16,7 +16,8 @@ lab03/
 │       ├── EbookProcessorTest.kt
 │       └── TreeSerializerTest.kt
 ├── .github/workflows/classroom.yml
-├── pom.xml
+├── build.gradle.kts
+├── settings.gradle.kts
 ├── ASSIGNMENT.md
 └── README.md
 ```
@@ -32,16 +33,16 @@ lab03/
 
 ```bash
 # Compilare și teste
-mvn -B test
+gradle test
 
 # Compilare fără teste
-mvn -B compile
+gradle classes
 ```
 
 ## Cerințe sistem
 
 - JDK 21 (Temurin recomandat)
-- Maven 3.8+
+- Gradle 8.11+ (sau IntelliJ cu suport Gradle)
 
 ## Citește mai mult
 

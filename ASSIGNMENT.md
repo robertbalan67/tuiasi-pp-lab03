@@ -115,7 +115,7 @@ fun deserialize(input: String): LinkNode
 ## Rulare teste
 
 ```bash
-mvn -B test
+gradle test
 ```
 
 Toate testele trebuie să treacă înainte de predare.
