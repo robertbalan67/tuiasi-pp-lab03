@@ -1,74 +1,46 @@
 package ro.tuiasi.pp.lab03.ebook
 
-/**
- * Procesor de text pentru fișiere ebook.
- *
- * Oferă funcții de curățare și normalizare a textului extras din ebook-uri,
- * folosind expresii regulate pentru identificarea și corectarea problemelor comune.
- */
 class EbookProcessor {
 
     /**
-     * Înlocuiește orice secvență de două sau mai multe spații cu un singur spațiu.
+     * Înlocuiește orice secvență de 2 sau mai multe spații cu un singur spațiu.
      *
-     * Exemplu: `"text  cu   spații"` → `"text cu spații"`
-     *
-     * @param text Textul de procesat
-     * @return Textul cu spații multiple normalizate
+     * Exemplu: "ana  are   mere" -> "ana are mere"
      */
-    fun removeMultipleSpaces(text: String): String {
-        // TODO("De implementat")
-        // Indiciu: folosiți Regex(" {2,}") sau " +" și replace cu " "
-        TODO("De implementat: înlocuiește 2+ spații consecutive cu un singur spațiu")
-    }
+    fun removeMultipleSpaces(text: String): String =
+        text.replace(Regex(" {2,}"), " ")
 
     /**
-     * Înlocuiește orice secvență de două sau mai multe linii goale cu o singură linie goală.
+     * Înlocuiește orice secvență de 3 sau mai multe newline-uri consecutive
+     * (= 2+ linii goale) cu exact 2 newline-uri (= o singură linie goală).
      *
-     * Exemplu: `"paragraf1\n\n\n\nparagraf2"` → `"paragraf1\n\nparagraf2"`
-     *
-     * @param text Textul de procesat
-     * @return Textul cu linii goale multiple normalizate
+     * Normalizează și \r\n la \n înainte de procesare.
      */
-    fun removeMultipleNewlines(text: String): String {
-        // TODO("De implementat")
-        // Indiciu: o "linie goală" înseamnă \n\n (sau \r\n\r\n pe Windows)
-        // Folosiți Regex("(\r?\n){3,}") și înlocuiți cu "\n\n"
-        TODO("De implementat: înlocuiește 3+ caractere newline consecutive cu exact 2")
-    }
+    fun removeMultipleNewlines(text: String): String =
+        text.replace("\r\n", "\n")
+            .replace(Regex("\n{3,}"), "\n\n")
 
     /**
-     * Elimină numerele de pagină din text.
+     * Elimină numerele de pagină apărute singure pe o linie
+     * (linie cu doar cifre, opțional înconjurate de spații).
      *
-     * Un număr de pagină apare pe o linie proprie, înconjurat de spații albe,
-     * de exemplu: `"\n   42   \n"`.
-     *
-     * @param text Textul de procesat
-     * @return Textul cu numerele de pagină eliminate
+     * Exemplu: "\n  42  \n" -> "\n\n"
+     * Foloseşte modul MULTILINE (^/$  = început/sfârşit de linie, nu de string).
      */
-    fun removePageNumbers(text: String): String {
-        // TODO("De implementat")
-        // Indiciu: un număr de pagină este un șir de cifre care apare singur pe o linie
-        // Regex sugerată: Regex("^\\s*\\d+\\s*$", RegexOption.MULTILINE)
-        // Înlocuiți potrivirile cu "" (șir gol)
-        TODO("De implementat: elimină liniile care conțin doar un număr (număr de pagină)")
-    }
+    fun removePageNumbers(text: String): String =
+        text.replace(Regex("(?m)^\\s*\\d+\\s*$"), "")
 
     /**
-     * Corectează caracterele românești encodate greșit (mapare veche).
+     * (Opțional) Corectează caractere românești encodate cu cedilă (greșit)
+     * în caractere cu virgulă (corect conform standardului Unicode).
      *
-     * Unele fișiere PDF/ebook encodează caracterele diacritice românești cu
-     * coduri cedilă în loc de virgulă (ş→ș, ţ→ț și variantele majuscule).
-     *
-     * @param text Textul de procesat
-     * @return Textul cu caracterele românești corectate
+     * ş (U+015F) → ș (U+0219)   s cu cedilă → s cu virgulă
+     * ţ (U+0163) → ț (U+021B)   t cu cedilă → t cu virgulă
      */
-    fun fixRomanianChars(text: String): String {
-        // TODO("De implementat") — opțional
-        // Înlocuiri necesare:
-        // 'ş' (U+015F, s cu cedilă) → 'ș' (U+0219, s cu virgulă dedesubt)
-        // 'ţ' (U+0163, t cu cedilă) → 'ț' (U+021B, t cu virgulă dedesubt)
-        // 'Ş' → 'Ș', 'Ţ' → 'Ț'
-        TODO("De implementat (opțional): corectează maparea veche a diacriticelor românești")
-    }
+    fun fixRomanianChars(text: String): String =
+        text
+            .replace('\u015F', '\u0219')  // ş → ș
+            .replace('\u015E', '\u0218')  // Ş → Ș
+            .replace('\u0163', '\u021B')  // ţ → ț
+            .replace('\u0162', '\u021A')  // Ţ → Ț
 }
