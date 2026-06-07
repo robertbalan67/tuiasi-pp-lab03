@@ -1,82 +1,149 @@
 package ro.tuiasi.pp.lab03.crawler
 
-/**
- * Web crawler care construiește un arbore de link-uri cu adâncimea 2.
- *
- * Pornind de la un URL de start, extrage toate link-urile din pagina respectivă,
- * apoi extrage link-urile din fiecare pagină găsită, păstrând doar link-urile
- * din același domeniu.
- *
- * Adâncime 2 înseamnă: URL start → link-urile sale (nivel 1) → link-urile lor (nivel 2).
- */
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import org.jsoup.Jsoup
+import java.net.URI
+import java.util.concurrent.TimeUnit
+
+// ─── ADT ──────────────────────────────────────────────────────────────────────
+
+data class LinkNode(
+    val url: String,
+    val children: MutableList<LinkNode> = mutableListOf()
+)
+
+// ─── Web Crawler ───────────────────────────────────────────────────────────────
+
 class WebCrawler {
 
+    private val client = OkHttpClient.Builder()
+        .connectTimeout(10, TimeUnit.SECONDS)
+        .readTimeout(10, TimeUnit.SECONDS)
+        .build()
+
     /**
-     * Efectuează crawling-ul pornind de la [startUrl] și returnează rădăcina arborelui de link-uri.
+     * Crawlează startUrl la adâncimea 2:
+     *   root (startUrl)
+     *     └─ level-1 links (din startUrl)
+     *          └─ level-2 links (din fiecare link de nivel 1)
      *
-     * @param startUrl URL-ul de la care pornește crawling-ul
-     * @return [LinkNode] reprezentând rădăcina arborelui (URL-ul de start cu copiii săi)
+     * Reguli:
+     *  - Păstrează doar link-uri din același domeniu ca startUrl
+     *  - Nu vizitează același URL de două ori
      */
     fun crawl(startUrl: String): LinkNode {
-        // TODO("De implementat")
-        // Pași de urmat:
-        // 1. Extrageți domeniul din startUrl (ex: "https://example.com" → "example.com")
-        //    Puteți folosi java.net.URI(startUrl).host
-        // 2. Creați nodul rădăcină: LinkNode(url = startUrl)
-        // 3. Folosiți OkHttp pentru a descărca HTML-ul paginii:
-        //    val client = OkHttpClient()
-        //    val request = Request.Builder().url(url).build()
-        //    val html = client.newCall(request).execute().body?.string() ?: ""
-        // 4. Folosiți jsoup pentru a extrage link-urile din HTML:
-        //    val doc = Jsoup.parse(html, startUrl)
-        //    val links = doc.select("a[href]").map { it.absUrl("href") }
-        // 5. Filtrați link-urile pentru a păstra doar cele din același domeniu
-        // 6. Mențineți un set de URL-uri vizitate pentru a evita ciclurile
-        // 7. Pentru fiecare link de nivel 1, repetați procesul pentru a obține nivel 2
-        // 8. Construiți arborele cu noduri copil
-        TODO("De implementat: crawling cu OkHttp/jsoup, adâncime 2, același domeniu")
+        val root = LinkNode(startUrl)
+        val visited = mutableSetOf(startUrl)
+        val domain = extractDomain(startUrl)
+
+        // Nivel 1
+        for (url1 in fetchLinks(startUrl, domain)) {
+            if (url1 in visited) continue
+            visited.add(url1)
+            val node1 = LinkNode(url1)
+            root.children.add(node1)
+
+            // Nivel 2
+            for (url2 in fetchLinks(url1, domain)) {
+                if (url2 in visited) continue
+                visited.add(url2)
+                node1.children.add(LinkNode(url2))
+            }
+        }
+
+        return root
     }
 
-    /**
-     * Extrage domeniul (host) dintr-un URL.
-     *
-     * @param url URL-ul complet
-     * @return Domeniul (ex: "example.com")
-     */
-    private fun extractDomain(url: String): String {
-        // TODO("De implementat")
-        // Indiciu: java.net.URI(url).host
-        TODO("De implementat: extrage domeniul din URL")
+    // ─── Helpers ──────────────────────────────────────────────────────────────
+
+    private fun fetchLinks(url: String, domain: String): List<String> = try {
+        val request = Request.Builder().url(url).build()
+        client.newCall(request).execute().use { response ->
+            val html = response.body?.string() ?: return emptyList()
+            Jsoup.parse(html, url)
+                .select("a[href]")
+                .map { it.absUrl("href") }
+                .filter { it.isNotBlank() && extractDomain(it) == domain }
+                .distinct()
+        }
+    } catch (_: Exception) {
+        emptyList()
     }
 
-    /**
-     * Descarcă conținutul HTML al unei pagini web.
-     *
-     * @param url URL-ul paginii de descărcat
-     * @return Conținutul HTML ca șir de caractere, sau șir gol la eroare
-     */
-    private fun fetchHtml(url: String): String {
-        // TODO("De implementat")
-        // Indiciu: folosiți OkHttpClient cu un timeout rezonabil (ex: 10 secunde)
-        // Tratați excepțiile și returnați "" la orice eroare de rețea
-        TODO("De implementat: descarcă HTML-ul paginii cu OkHttp")
+    private fun extractDomain(url: String): String = try {
+        URI(url).host?.lowercase() ?: ""
+    } catch (_: Exception) {
+        ""
+    }
+}
+
+// ─── Tree Serializer ──────────────────────────────────────────────────────────
+
+/**
+ * Serializare/deserializare arbore de link-uri.
+ *
+ * Format ales: "adancime:url" pe fiecare linie
+ *
+ *   0:https://example.com
+ *   1:https://example.com/page1
+ *   2:https://example.com/page1/sub1
+ *   2:https://example.com/page1/sub2
+ *   1:https://example.com/page2
+ *
+ * Primul ":" este separatorul de adâncime — restul liniei este URL-ul complet
+ * (inclusiv "https://..." care conține ":" în el).
+ * Roundtrip garantat: deserialize(serialize(root)) == root
+ */
+class TreeSerializer {
+
+    fun serialize(root: LinkNode): String {
+        val sb = StringBuilder()
+        serializeNode(root, depth = 0, sb)
+        return sb.toString().trimEnd('\n')
     }
 
-    /**
-     * Extrage toate link-urile absolute din HTML, filtrând după domeniu.
-     *
-     * @param html Conținutul HTML al paginii
-     * @param baseUrl URL-ul de bază (folosit pentru rezolvarea link-urilor relative)
-     * @param domain Domeniul permis (se păstrează doar link-urile din acest domeniu)
-     * @return Lista de URL-uri absolute filtrate
-     */
-    private fun extractLinks(html: String, baseUrl: String, domain: String): List<String> {
-        // TODO("De implementat")
-        // Indiciu:
-        // val doc = Jsoup.parse(html, baseUrl)
-        // doc.select("a[href]")
-        //   .map { it.absUrl("href") }
-        //   .filter { it.contains(domain) }
-        TODO("De implementat: parsează HTML-ul și extrage link-urile din același domeniu")
+    private fun serializeNode(node: LinkNode, depth: Int, sb: StringBuilder) {
+        sb.append("$depth:${node.url}\n")
+        for (child in node.children) {
+            serializeNode(child, depth + 1, sb)
+        }
+    }
+
+    fun deserialize(input: String): LinkNode {
+        val lines = input.trim().lines().filter { it.isNotBlank() }
+        require(lines.isNotEmpty()) { "Input gol — nu se poate deserializa" }
+
+        // Parsăm prima linie ca rădăcină
+        val (rootDepth, rootUrl) = parseLine(lines[0])
+        require(rootDepth == 0) { "Prima linie trebuie să aibă adâncimea 0" }
+        val root = LinkNode(rootUrl)
+
+        // Stivă de (adâncime, nod) — menţinem calea curentă de la rădăcină
+        val stack = ArrayDeque<Pair<Int, LinkNode>>()
+        stack.addLast(0 to root)
+
+        for (line in lines.drop(1)) {
+            val (depth, url) = parseLine(line)
+            val node = LinkNode(url)
+
+            // Scoatem din stivă până găsim părintele (adâncime = depth - 1)
+            while (stack.isNotEmpty() && stack.last().first >= depth) {
+                stack.removeLast()
+            }
+
+            stack.last().second.children.add(node)
+            stack.addLast(depth to node)
+        }
+
+        return root
+    }
+
+    private fun parseLine(line: String): Pair<Int, String> {
+        val colonIdx = line.indexOf(':')
+        require(colonIdx > 0) { "Linie invalidă (fără ':' prefix): $line" }
+        val depth = line.substring(0, colonIdx).toInt()
+        val url   = line.substring(colonIdx + 1)
+        return depth to url
     }
 }
